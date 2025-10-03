@@ -22,7 +22,17 @@ exports.login = async (req, res) => {
 };
 
 exports.me = async (req, res) => {
-  res.json({ user: req.user });
+  try {
+    if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
+    const [rows] = await pool.query('SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1', [req.userId]);
+    const user = rows[0];
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+    return res.json(user);
+  } catch (e) {
+    console.error("me error", e);
+    return res.status(500).json({ message: "Internal error" });
+  }
 };
 
 exports.logout = async (req, res) => {
