@@ -1,12 +1,14 @@
 // =====================
 // Load Environment Variables
 // =====================
-require('dotenv').config();
+require("dotenv").config();
 
-const express = require('express');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-const routes = require('./routes'); // <- index.js otomatis gabung semua route
+const express = require("express");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+const http = require("http");
+const { Server } = require("socket.io");
+const routes = require("./routes"); // <- index.js otomatis gabung semua route
 
 const app = express();
 
@@ -17,7 +19,7 @@ const app = express();
 // CORS → izinkan akses dari Frontend (Next.js, dll.)
 app.use(
   cors({
-    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
+    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
     credentials: true,
   })
 );
@@ -31,20 +33,43 @@ app.use(cookieParser());
 // =====================
 // Health Check Route
 // =====================
-app.get('/health', (_, res) =>
-  res.json({ ok: true, service: 'colivera-be' })
+app.get("/health", (_, res) =>
+  res.json({ ok: true, service: "colivera-be" })
 );
 
 // =====================
 // Routes Utama
 // =====================
 // Semua route dikumpulkan di /src/routes/index.js
-app.use('/api', routes);
+app.use("/api", routes);
+
+// =====================
+// Setup Socket.IO Server
+// =====================
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
+    credentials: true,
+  },
+});
+
+// Simpan instance IO secara global biar bisa dipanggil dari controller
+global._io = io;
+
+// Listener untuk koneksi client socket
+io.on("connection", (socket) => {
+  console.log("🟢 Socket connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
+  });
+});
 
 // =====================
 // Jalankan Server
 // =====================
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () =>
-  console.log(`✅ COLIVERA-BE running on http://localhost:${PORT}`)
+server.listen(PORT, () =>
+  console.log(`✅ COLIVERA-BE running with Socket.IO on http://localhost:${PORT}`)
 );

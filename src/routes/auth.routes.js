@@ -1,10 +1,28 @@
-// src/routes/auth.routes.js
-const router = require('express').Router();
-const ctrl = require('../controllers/auth.controller');
+const express = require("express");
+const router = express.Router();
 
-// PENTING: pakai referensi fungsi (tanpa "()")
-router.post('/login', ctrl.login);
-router.get('/me', require('../middleware/auth'), ctrl.me);
-router.post('/logout', ctrl.logout);
+// Import controller & middleware
+const authCtrl = require("../controllers/auth.controller");
+const verifyToken = require("../middleware/verifyToken");
+const sessionWatcher = require("../middleware/sessionWatcher");
+
+// ===============================
+// AUTH ROUTES
+// ===============================
+
+// [POST] /api/auth/login
+// - Verifikasi email & password
+// - Generate JWT + set cookie
+router.post("/login", authCtrl.login);
+
+// [GET] /api/auth/me
+// - Verifikasi token dari cookie
+// - Sinkronisasi role user (real-time)
+// - Mengembalikan data user aktif
+router.get("/me", verifyToken, sessionWatcher, authCtrl.me);
+
+// [POST] /api/auth/logout
+// - Menghapus cookie JWT
+router.post("/logout", authCtrl.logout);
 
 module.exports = router;

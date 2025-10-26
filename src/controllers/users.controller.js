@@ -26,12 +26,18 @@ exports.create = async (req, res) => {
       [req.userId, r.insertId, JSON.stringify({ name, email, role: safeRole })]
     );
 
+    // Emit event realtime: user baru dibuat
+    if (global._io) {
+      global._io.emit("userCreated", { id: r.insertId, name, email, role: safeRole });
+    }
+
     res.status(201).json({ id: r.insertId, name, email, role: safeRole });
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ message: "Email already exists" });
     }
-    throw err;
+    console.error("Error in users.create:", err);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -39,11 +45,36 @@ exports.create = async (req, res) => {
  * GET /api/users
  * List semua user (kecuali yang soft-deleted)
  */
-exports.list = async (_req, res) => {
-  const [rows] = await pool.query(
-    "SELECT id, name, email, role, is_deleted, created_at, updated_at FROM users WHERE is_deleted=0 ORDER BY id DESC"
-  );
-  res.json(rows);
+exports.list = async (req, res) => {
+  try {
+    const { q, role } = req.query;
+    let sql = `
+      SELECT id, name, email, role, is_deleted, created_at, updated_at
+      FROM users
+      WHERE is_deleted = 0
+    `;
+    const params = [];
+
+    // Search nama / email
+    if (q && q.trim() !== "") {
+      sql += ` AND (name LIKE ? OR email LIKE ?)`;
+      params.push(`%${q}%`, `%${q}%`);
+    }
+
+    // Filter role
+    if (role && role !== "all") {
+      sql += ` AND role = ?`;
+      params.push(role.toLowerCase());
+    }
+
+    sql += ` ORDER BY id DESC`;
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error in users.list:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 /**
@@ -62,7 +93,7 @@ exports.getOne = async (req, res) => {
 
 /**
  * PATCH /api/users/:id
- * Update name/email/role
+ * Update name/email/role (Realtime support)
  */
 exports.update = async (req, res) => {
   const id = Number(req.params.id);
@@ -70,9 +101,18 @@ exports.update = async (req, res) => {
   const updates = [];
   const params = [];
 
-  if (name) { updates.push("name=?"); params.push(name); }
-  if (email) { updates.push("email=?"); params.push(email); }
-  if (role)  { updates.push("role=?"); params.push(role === "superadmin" ? "superadmin" : "admin"); }
+  if (name) {
+    updates.push("name=?");
+    params.push(name);
+  }
+  if (email) {
+    updates.push("email=?");
+    params.push(email);
+  }
+  if (role) {
+    updates.push("role=?");
+    params.push(role === "superadmin" ? "superadmin" : "admin");
+  }
 
   if (updates.length === 0) {
     return res.status(400).json({ message: "No fields to update" });
@@ -86,7 +126,9 @@ exports.update = async (req, res) => {
       `UPDATE users SET ${updates.join(", ")} WHERE id=? AND is_deleted=0`,
       params
     );
-    if (r.affectedRows === 0) return res.status(404).json({ message: "User not found" });
+    if (r.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     // Audit log
     await pool.query(
@@ -98,18 +140,31 @@ exports.update = async (req, res) => {
       "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id=? LIMIT 1",
       [id]
     );
-    res.json(rows2[0]);
+    const updatedUser = rows2[0];
+
+    // ==========================================
+    // 🔔 Emit event ke frontend kalau role berubah
+    // ==========================================
+    if (global._io && role) {
+      global._io.emit("roleChanged", {
+        userId: id,
+        newRole: updatedUser.role,
+      });
+      console.log(`📡 roleChanged emitted for user ${id}: ${updatedUser.role}`);
+    }
+
+    res.json(updatedUser);
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ message: "Email already exists" });
     }
-    throw err;
+    console.error("Error in users.update:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 /**
  * PATCH /api/users/:id/password
- * Reset / ganti password user
  */
 exports.changePassword = async (req, res) => {
   const id = Number(req.params.id);
@@ -117,6 +172,7 @@ exports.changePassword = async (req, res) => {
   if (!newPassword || newPassword.length < 8) {
     return res.status(400).json({ message: "newPassword min 8 chars" });
   }
+
   const hash = await bcrypt.hash(newPassword, 10);
   const [r] = await pool.query(
     "UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=? AND is_deleted=0",
@@ -150,6 +206,11 @@ exports.remove = async (req, res) => {
     "INSERT INTO audit_logs (actor_id, target_user_id, action) VALUES (?, ?, 'DELETE')",
     [req.userId, id]
   );
+
+  // Emit event realtime
+  if (global._io) {
+    global._io.emit("userDeleted", { userId: id });
+  }
 
   res.json({ ok: true });
 };
