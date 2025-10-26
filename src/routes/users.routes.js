@@ -1,15 +1,15 @@
 // src/routes/users.routes.js
 const router = require('express').Router();
-const auth = require('../middleware/auth');
+const verifyToken = require('../middleware/verifyToken');
 const requireRole = require('../middleware/role');
 const ctrl = require('../controllers/users.controller');
 
 // Semua endpoint hanya bisa diakses oleh SuperAdmin
-router.post('/', auth, requireRole(['superadmin']), ctrl.create);
-router.get('/', auth, requireRole(['superadmin']), ctrl.list);
-router.get('/:id', auth, requireRole(['superadmin']), ctrl.getOne);
-router.patch('/:id', auth, requireRole(['superadmin']), ctrl.update);
-router.patch('/:id/password', auth, requireRole(['superadmin']), ctrl.changePassword);
-router.delete('/:id', auth, requireRole(['superadmin']), ctrl.remove);
+router.post('/', verifyToken, requireRole(['superadmin']), ctrl.create);
+router.get('/', verifyToken, requireRole(['superadmin']), ctrl.list);
+router.get('/:id', verifyToken, requireRole(['superadmin']), ctrl.getOne);
+router.patch('/:id', verifyToken, requireRole(['superadmin']), ctrl.update);
+router.patch('/:id/password', verifyToken, requireRole(['superadmin']), ctrl.changePassword);
+router.delete('/:id', verifyToken, requireRole(['superadmin']), ctrl.remove);
 
 module.exports = router;
