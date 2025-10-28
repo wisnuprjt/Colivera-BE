@@ -7,7 +7,7 @@ const {
   removeNotification,
 } = require("../models/notifications.model");
 
-const { validateCreateNotification } = require("../schemas/notifications.schema");
+const { validateCreateNotification } = require("../validators/notifications.schema");
 
 /**
  * GET /api/notifications
