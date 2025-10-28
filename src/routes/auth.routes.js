@@ -25,4 +25,8 @@ router.get("/me", verifyToken, sessionWatcher, authCtrl.me);
 // - Menghapus cookie JWT
 router.post("/logout", authCtrl.logout);
 
+// [POST] /api/auth/refresh
+// - Refresh access token menggunakan refresh token
+router.post("/refresh", authCtrl.refreshToken);
+
 module.exports = router;

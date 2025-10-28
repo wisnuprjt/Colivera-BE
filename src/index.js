@@ -44,6 +44,13 @@ app.get("/health", (_, res) =>
 app.use("/api", routes);
 
 // =====================
+// Cron Jobs
+// =====================
+// Inisialisasi cron job untuk menangani user yang tidak aktif
+require("../tools/inactivity.cron");
+
+
+// =====================
 // Setup Socket.IO Server
 // =====================
 const server = http.createServer(app);

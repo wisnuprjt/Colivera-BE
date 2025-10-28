@@ -31,11 +31,25 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       payload,
       process.env.JWT_SECRET || 'colivera_secret_key',
-      { expiresIn: '2h' }
+      { expiresIn: '1h' } // Access token: 1 jam
+    );
+
+    // ===== BUAT REFRESH TOKEN =====
+    const refreshToken = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.REFRESH_TOKEN_SECRET || 'colivera_refresh_secret_key',
+      { expiresIn: '7d' } // Refresh token: 7 hari
     );
 
     // ===== SIMPAN TOKEN KE COOKIE (untuk frontend) =====
     res.cookie('token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      path: '/',
+    });
+
+    res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
       secure: false,
@@ -86,8 +100,54 @@ exports.me = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     res.clearCookie('token', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/' });
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (e) {
     res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+// =============================
+// POST /api/auth/refresh
+// Manual refresh token endpoint (opsional)
+// =============================
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'Refresh token not found' });
+    }
+
+    // Verifikasi refresh token
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET || 'colivera_refresh_secret_key'
+    );
+
+    // Buat access token baru
+    const newAccessToken = jwt.sign(
+      { id: decoded.id, role: decoded.role },
+      process.env.JWT_SECRET || 'colivera_secret_key',
+      { expiresIn: '1h' }
+    );
+
+    // Set cookie baru
+    res.cookie('token', newAccessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      path: '/',
+    });
+
+    res.json({
+      success: true,
+      token: newAccessToken,
+      message: 'Token refreshed successfully'
+    });
+
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(403).json({ message: 'Invalid refresh token' });
   }
 };

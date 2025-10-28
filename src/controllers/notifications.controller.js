@@ -1,81 +1,100 @@
-const NotificationModel = require('../models/notifications.model');
-const { validateCreateNotification } = require('../validators/notifications.schema');
+const {
+  getNotifications,
+  createNotification,
+  getUnreadCount,
+  markAsRead,
+  markAsResolved,
+  removeNotification,
+} = require("../models/notifications.model");
 
-async function listNotifications(req, res) {
+const { validateCreateNotification } = require("../schemas/notifications.schema");
+
+/**
+ * GET /api/notifications
+ * Query opsional:
+ *   ?type=inactivity
+ *   ?active=1
+ *   ?limit=10
+ *   ?status=unread
+ */
+exports.list = async (req, res) => {
   try {
-    const { status, limit, offset } = req.query;
-    const data = await NotificationModel.getNotifications({ status, limit, offset });
-    res.json({ success: true, data });
+    const { type, status, active, limit, offset } = req.query;
+    const rows = await getNotifications({ type, status, active, limit, offset });
+    res.json({ success: true, data: rows });
   } catch (err) {
-    console.error('listNotifications error:', err);
-    res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
+    console.error("Error fetching notifications:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
 
-async function unreadCount(req, res) {
+/**
+ * GET /api/notifications/unread-count
+ */
+exports.unreadCount = async (_req, res) => {
   try {
-    const count = await NotificationModel.getUnreadCount();
-    res.json({ success: true, data: { unread: count } });
+    const count = await getUnreadCount();
+    res.json({ success: true, count });
   } catch (err) {
-    console.error('unreadCount error:', err);
-    res.status(500).json({ success: false, message: 'Failed to fetch unread count' });
+    console.error("Error fetching unread count:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
 
-async function createNotification(req, res) {
+/**
+ * POST /api/notifications
+ */
+exports.create = async (req, res) => {
   try {
     const { valid, errors } = validateCreateNotification(req.body);
     if (!valid) return res.status(400).json({ success: false, errors });
 
-    const created = await NotificationModel.createNotification(req.body);
-    res.status(201).json({ success: true, data: created });
+    const notif = await createNotification(req.body);
+    res.status(201).json({ success: true, data: notif });
   } catch (err) {
-    console.error('createNotification error:', err);
-    res.status(500).json({ success: false, message: 'Failed to create notification' });
+    console.error("Error creating notification:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
 
-async function markRead(req, res) {
+/**
+ * PATCH /api/notifications/:id/read
+ */
+exports.markRead = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updated = await NotificationModel.markAsRead(id);
-    if (!updated) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true, data: updated });
+    const notif = await markAsRead(req.params.id);
+    if (!notif) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, data: notif });
   } catch (err) {
-    console.error('markRead error:', err);
-    res.status(500).json({ success: false, message: 'Failed to mark read' });
+    console.error("Error marking read:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
 
-async function markResolved(req, res) {
+/**
+ * PATCH /api/notifications/:id/resolve
+ */
+exports.markResolved = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updated = await NotificationModel.markAsResolved(id);
-    if (!updated) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true, data: updated });
+    const notif = await markAsResolved(req.params.id);
+    if (!notif) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, data: notif });
   } catch (err) {
-    console.error('markResolved error:', err);
-    res.status(500).json({ success: false, message: 'Failed to mark resolved' });
+    console.error("Error resolving notification:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
 
-async function remove(req, res) {
+/**
+ * DELETE /api/notifications/:id
+ */
+exports.remove = async (req, res) => {
   try {
-    const { id } = req.params;
-    const ok = await NotificationModel.removeNotification(id);
-    if (!ok) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true });
+    const deleted = await removeNotification(req.params.id);
+    if (!deleted) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, message: "Notification deleted" });
   } catch (err) {
-    console.error('remove notification error:', err);
-    res.status(500).json({ success: false, message: 'Failed to delete notification' });
+    console.error("Error deleting notification:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
-
-module.exports = {
-  listNotifications,
-  unreadCount,
-  createNotification,
-  markRead,
-  markResolved,
-  remove,
 };
