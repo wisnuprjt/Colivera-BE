@@ -26,12 +26,18 @@ exports.create = async (req, res) => {
       [req.userId, r.insertId, JSON.stringify({ name, email, role: safeRole })]
     );
 
-    // Emit event realtime: user baru dibuat
+    // Emit event realtime
     if (global._io) {
       global._io.emit("userCreated", { id: r.insertId, name, email, role: safeRole });
     }
 
-    res.status(201).json({ id: r.insertId, name, email, role: safeRole });
+    // Ambil data user baru untuk kirim ke frontend
+    const [rows] = await pool.query(
+      "SELECT id, name, email, role, created_at FROM users WHERE id=? LIMIT 1",
+      [r.insertId]
+    );
+
+    res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ message: "Email already exists" });
@@ -55,13 +61,11 @@ exports.list = async (req, res) => {
     `;
     const params = [];
 
-    // Search nama / email
     if (q && q.trim() !== "") {
       sql += ` AND (name LIKE ? OR email LIKE ?)`;
       params.push(`%${q}%`, `%${q}%`);
     }
 
-    // Filter role
     if (role && role !== "all") {
       sql += ` AND role = ?`;
       params.push(role.toLowerCase());
@@ -79,6 +83,7 @@ exports.list = async (req, res) => {
 
 /**
  * GET /api/users/:id
+ * Ambil detail user berdasarkan ID
  */
 exports.getOne = async (req, res) => {
   const id = Number(req.params.id);
@@ -92,8 +97,27 @@ exports.getOne = async (req, res) => {
 };
 
 /**
+ * GET /api/users/profile
+ * Ambil profil user login (dari token)
+ */
+exports.getProfile = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id=? AND is_deleted=0 LIMIT 1",
+      [req.userId]
+    );
+    if (rows.length === 0)
+      return res.status(404).json({ message: "User not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error in users.getProfile:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
  * PATCH /api/users/:id
- * Update name/email/role (Realtime support)
+ * Update name/email/role
  */
 exports.update = async (req, res) => {
   const id = Number(req.params.id);
@@ -142,9 +166,7 @@ exports.update = async (req, res) => {
     );
     const updatedUser = rows2[0];
 
-    // ==========================================
-    // 🔔 Emit event ke frontend kalau role berubah
-    // ==========================================
+    // Emit event realtime
     if (global._io && role) {
       global._io.emit("roleChanged", {
         userId: id,
@@ -207,7 +229,6 @@ exports.remove = async (req, res) => {
     [req.userId, id]
   );
 
-  // Emit event realtime
   if (global._io) {
     global._io.emit("userDeleted", { userId: id });
   }

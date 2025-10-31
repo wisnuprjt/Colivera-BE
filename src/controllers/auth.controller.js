@@ -71,28 +71,36 @@ exports.login = async (req, res) => {
 // =============================
 // GET /api/auth/me
 // =============================
+// =============================
+// GET /api/auth/me
+// =============================
 exports.me = async (req, res) => {
   try {
     if (!req.userId)
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({ message: "Unauthorized" });
 
+    // ✅ tambahkan created_at dan updated_at agar FE bisa tahu kapan akun dibuat
     const [rows] = await pool.query(
-      'SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1',
+      `SELECT id, name, email, role, created_at, updated_at 
+       FROM users 
+       WHERE id = ? AND is_deleted = 0 
+       LIMIT 1`,
       [req.userId]
     );
 
     const user = rows[0];
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     return res.json({
       success: true,
-      user,
+      user, // sudah berisi created_at
     });
   } catch (e) {
-    console.error('me error', e);
-    return res.status(500).json({ message: 'Internal error' });
+    console.error("me error", e);
+    return res.status(500).json({ message: "Internal error" });
   }
 };
+
 
 // =============================
 // POST /api/auth/logout
