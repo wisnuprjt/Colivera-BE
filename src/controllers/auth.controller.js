@@ -4,21 +4,57 @@ const jwt = require('jsonwebtoken');
 
 exports.login = async (req, res) => {
   try {
+    // ===== VALIDASI INPUT =====
     const { email, password } = req.body || {};
-    if (!email || !password)
-      return res.status(400).json({ message: 'Bad payload' });
+    
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email dan password harus diisi' 
+      });
+    }
 
-    const [rows] = await pool.query(
-      'SELECT * FROM users WHERE email=? LIMIT 1',
-      [email]
-    );
+    // ===== CEK EMAIL DI DATABASE =====
+    let rows;
+    try {
+      [rows] = await pool.query(
+        'SELECT * FROM users WHERE email=? LIMIT 1',
+        [email]
+      );
+    } catch (dbError) {
+      console.error('Database connection error:', dbError);
+      return res.status(503).json({ 
+        success: false,
+        message: 'Koneksi ke database gagal. Periksa koneksi internet Anda.' 
+      });
+    }
+
     const user = rows[0];
-    if (!user)
-      return res.status(401).json({ message: 'Invalid credentials' });
+    
+    // ===== CEK APAKAH EMAIL TERDAFTAR =====
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Email tidak terdaftar' 
+      });
+    }
 
+    // ===== CEK APAKAH AKUN SUDAH DIHAPUS =====
+    if (user.is_deleted === 1) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' 
+      });
+    }
+
+    // ===== VERIFIKASI PASSWORD =====
     const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok)
-      return res.status(401).json({ message: 'Invalid credentials' });
+    if (!ok) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Password salah' 
+      });
+    }
 
     // ===== BUAT TOKEN JWT =====
     const payload = {
@@ -59,12 +95,27 @@ exports.login = async (req, res) => {
     // ===== KIRIM RESPONSE KE CLIENT (FE & Postman) =====
     res.status(200).json({
       success: true,
+      message: 'Login berhasil',
       token, // 🧩 dikirim agar Postman / FE bisa pakai Authorization header
       user: payload,
     });
+
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
+    
+    // Detect network/connection errors
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+      return res.status(503).json({ 
+        success: false,
+        message: 'Koneksi internet bermasalah. Periksa koneksi Anda.' 
+      });
+    }
+    
+    // Generic server error
+    res.status(500).json({ 
+      success: false,
+      message: 'Terjadi kesalahan pada server. Silakan coba lagi.' 
+    });
   }
 };
 
