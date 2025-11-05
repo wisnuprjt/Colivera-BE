@@ -9,6 +9,7 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const { Server } = require("socket.io");
 const routes = require("./routes"); // <- index.js otomatis gabung semua route
+const overrideRoutes = require("./routes/override.routes");
 
 const app = express();
 
@@ -27,6 +28,18 @@ app.use(
 // Body Parser JSON → agar req.body bisa dibaca di POST/PATCH
 app.use(express.json());
 
+// Error handler untuk JSON parse error
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('❌ Bad JSON:', err.message);
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid JSON format in request body' 
+    });
+  }
+  next();
+});
+
 // Cookie Parser → supaya backend bisa baca cookie JWT
 app.use(cookieParser());
 
@@ -42,6 +55,7 @@ app.get("/health", (_, res) =>
 // =====================
 // Semua route dikumpulkan di /src/routes/index.js
 app.use("/api", routes);
+app.use("/api/override", overrideRoutes);
 
 // =====================
 // Cron Jobs

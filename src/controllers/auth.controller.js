@@ -130,17 +130,30 @@ exports.me = async (req, res) => {
     if (!req.userId)
       return res.status(401).json({ message: "Unauthorized" });
 
-    // ✅ tambahkan created_at dan updated_at agar FE bisa tahu kapan akun dibuat
+    // ✅ Cek user termasuk is_deleted untuk deteksi akun terhapus
     const [rows] = await pool.query(
-      `SELECT id, name, email, role, created_at, updated_at 
+      `SELECT id, name, email, role, is_deleted, created_at, updated_at 
        FROM users 
-       WHERE id = ? AND is_deleted = 0 
+       WHERE id = ? 
        LIMIT 1`,
       [req.userId]
     );
 
     const user = rows[0];
-    if (!user) return res.status(404).json({ message: "User not found" });
+    
+    // ✅ Jika user tidak ditemukan ATAU sudah dihapus → force logout
+    if (!user || user.is_deleted === 1) {
+      res.clearCookie("token");
+      res.clearCookie("refreshToken");
+      return res.status(401).json({ 
+        accountDeleted: true, 
+        forceLogout: true,
+        message: "Akun Anda telah dihapus" 
+      });
+    }
+
+    // Hapus is_deleted dari response (tidak perlu dikirim ke frontend)
+    delete user.is_deleted;
 
     return res.json({
       success: true,

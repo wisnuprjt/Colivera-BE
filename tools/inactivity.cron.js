@@ -1,6 +1,7 @@
 // src/tools/inactivity.cron.js
 const cron = require("node-cron");
 const pool = require("../src/models/db");
+const { sendTelegram, formatInactivityNotif } = require("../src/services/telegram.service");
 
 // waktu inactivity threshold (menit)
 const INACTIVITY_THRESHOLD_MINUTES = Number(process.env.INACTIVITY_MINUTES || 60);
@@ -49,6 +50,15 @@ async function checkInactivity() {
               [s.id, message, s.last_seen, INACTIVITY_THRESHOLD_MINUTES]
             );
             console.log(`⚠️ Notifikasi inactivity dibuat untuk sensor ID ${s.id}`);
+
+            // Kirim Telegram (best effort)
+            const tgText = formatInactivityNotif({
+              sensor_name: s.name,
+              sensor_id: s.id,
+              last_seen: s.last_seen,
+              threshold_min: INACTIVITY_THRESHOLD_MINUTES,
+            });
+            sendTelegram(tgText).catch(() => {});
           }
         }
       }
@@ -84,3 +94,4 @@ cron.schedule("*/5 * * * *", () => {
 });
 
 module.exports = { checkInactivity };
+

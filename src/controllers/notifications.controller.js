@@ -8,6 +8,7 @@ const {
 } = require("../models/notifications.model");
 
 const { validateCreateNotification } = require("../validators/notifications.schema");
+const { sendTelegram, formatThresholdNotif, formatInactivityNotif } = require("../services/telegram.service");
 
 /**
  * GET /api/notifications
@@ -49,7 +50,38 @@ exports.create = async (req, res) => {
     const { valid, errors } = validateCreateNotification(req.body);
     if (!valid) return res.status(400).json({ success: false, errors });
 
-    const notif = await createNotification(req.body);
+    // Pastikan meta di-stringify kalau ada
+    const payload = { ...req.body };
+    if (payload.meta && typeof payload.meta === 'object') {
+      payload.meta = JSON.stringify(payload.meta);
+    }
+
+    const notif = await createNotification(payload);
+
+    // === Kirim Telegram berdasar type ===
+    try {
+      let text;
+      if (notif.type === "inactivity") {
+        const meta = typeof notif.meta === "string" ? JSON.parse(notif.meta || "{}") : (notif.meta || {});
+        text = formatInactivityNotif({
+          sensor_name: notif.sensor_name,
+          sensor_id: notif.sensor_id,
+          last_seen: meta?.last_seen || "-",
+          threshold_min: meta?.threshold_min || "-",
+        });
+      } else {
+        text = formatThresholdNotif({
+          sensor_name: notif.sensor_name,
+          sensor_id: notif.sensor_id,
+          cfu_value: notif.cfu_value,
+          threshold: notif.threshold,
+        });
+      }
+      sendTelegram(text).catch(() => {});
+    } catch (e) {
+      console.warn("Telegram send skipped:", e.message);
+    }
+
     res.status(201).json({ success: true, data: notif });
   } catch (err) {
     console.error("Error creating notification:", err);
