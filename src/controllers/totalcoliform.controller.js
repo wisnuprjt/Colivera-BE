@@ -3,14 +3,13 @@ const coliformModel = require("../models/totalcoliform.model");
 // POST /api/coliform
 exports.create = async (req, res) => {
   try {
-    const { sensor_id, mpn_value, raw_voltage, status } = req.body;
-    if (!sensor_id || !mpn_value)
-      return res.status(400).json({ message: "Missing sensor_id or mpn_value" });
+    const { sensor_data_id, mpn_value, status } = req.body;
+    if (!sensor_data_id || !mpn_value)
+      return res.status(400).json({ message: "Missing sensor_data_id or mpn_value" });
 
     const id = await coliformModel.insertColiform(
-      sensor_id,
+      sensor_data_id,
       mpn_value,
-      raw_voltage || null,
       status || "Normal"
     );
     res.status(201).json({ message: "Data inserted", id });

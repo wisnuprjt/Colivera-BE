@@ -1,29 +1,46 @@
 const pool = require("./db");
 
-// Ambil semua notifikasi (bisa difilter)
+// Ambil semua notifikasi (bisa difilter) dengan JOIN ke sensor_data
 async function getNotifications({ type, status, active, limit = 20, offset = 0 } = {}) {
   let sql = `
-    SELECT id, sensor_id, message, type, severity, active, status, meta,
-           cfu_value, threshold, created_at, read_at, resolved_at
-    FROM notifications
+    SELECT 
+      n.id, 
+      n.sensor_id, 
+      n.message, 
+      n.type, 
+      n.severity, 
+      n.active, 
+      n.status, 
+      n.meta,
+      n.cfu_value, 
+      n.threshold, 
+      n.created_at, 
+      n.read_at, 
+      n.resolved_at,
+      s.timestamp as sensor_timestamp,
+      s.temp_c,
+      s.ph,
+      s.do_mgl
+    FROM notifications n
+    LEFT JOIN sensor_data s ON n.sensor_id = s.id
     WHERE 1=1
   `;
   const params = [];
 
   if (type) {
-    sql += ` AND type = ?`;
+    sql += ` AND n.type = ?`;
     params.push(type);
   }
   if (status) {
-    sql += ` AND status = ?`;
+    sql += ` AND n.status = ?`;
     params.push(status);
   }
   if (active !== undefined) {
-    sql += ` AND active = ?`;
+    sql += ` AND n.active = ?`;
     params.push(Number(active) ? 1 : 0);
   }
 
-  sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  sql += ` ORDER BY n.created_at DESC LIMIT ? OFFSET ?`;
   params.push(Number(limit), Number(offset));
 
   const [rows] = await pool.query(sql, params);

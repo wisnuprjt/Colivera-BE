@@ -74,14 +74,15 @@ function formatInactivityNotif({ sensor_name, sensor_id, last_seen, threshold_mi
 
 function formatThresholdNotif({ sensor_name, sensor_id, cfu_value, threshold }) {
   return [
-    "🚨 <b>Alert E. coli</b>",
+    "🚨 <b>PERINGATAN THRESHOLD!</b>",
     `<b>Sensor:</b> ${sensor_name || `ID ${sensor_id}`}`,
-    `<b>Nilai CFU:</b> ${cfu_value}`,
-    `<b>Threshold:</b> ${threshold}`,
+    `<b>Nilai CFU:</b> ${cfu_value || "-"}`,
+    `<b>Batas Aman:</b> ${threshold || "-"}`,
     "",
-    "Status: Melebihi ambang batas.",
+    "⚠️ Nilai melebihi ambang batas yang ditentukan.",
   ].join("\n");
 }
+
 
 module.exports = {
   sendTelegram,

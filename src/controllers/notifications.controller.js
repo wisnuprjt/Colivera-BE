@@ -64,14 +64,14 @@ exports.create = async (req, res) => {
       if (notif.type === "inactivity") {
         const meta = typeof notif.meta === "string" ? JSON.parse(notif.meta || "{}") : (notif.meta || {});
         text = formatInactivityNotif({
-          sensor_name: notif.sensor_name,
+          sensor_name: "Sensor IoT Utama", // Label fixed karena cuma 1 sensor
           sensor_id: notif.sensor_id,
           last_seen: meta?.last_seen || "-",
           threshold_min: meta?.threshold_min || "-",
         });
       } else {
         text = formatThresholdNotif({
-          sensor_name: notif.sensor_name,
+          sensor_name: "Sensor IoT Utama", // Label fixed karena cuma 1 sensor
           sensor_id: notif.sensor_id,
           cfu_value: notif.cfu_value,
           threshold: notif.threshold,

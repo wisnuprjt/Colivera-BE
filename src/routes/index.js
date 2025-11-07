@@ -8,6 +8,7 @@ const authRoutes = require('./auth.routes');
 const userRoutes = require('./users.routes');
 const notificationRoutes = require('./notifications.routes');
 const totalColiformRoutes = require('./totalcoliform.routes'); // 🆕 Tambahan baru
+const sensorRoutes = require('./sensor.routes'); // 🆕 Route untuk sensor & AI prediction
 
 // =====================
 // Tes Endpoint Dasar
@@ -23,6 +24,7 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/coliform', totalColiformRoutes); // 🆕 Route baru untuk Total Coliform
+router.use('/sensor', sensorRoutes); // 🆕 Route baru untuk Sensor & AI Prediction
 
 // =====================
 // Export Router
