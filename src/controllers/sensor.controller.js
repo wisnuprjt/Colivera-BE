@@ -385,9 +385,46 @@ exports.getColiformHistory = async (req, res) => {
     const limit = parseInt(req.query.limit) || 100;
     const history = await sensorModel.getColiformHistory(limit);
     
+    // Format data untuk tabel (terbaru → terlama) dengan formatted timestamp
+    const formattedData = history.map(item => ({
+      id: item.id,
+      sensor_data_id: item.sensor_data_id,
+      mpn_value: item.mpn_value,
+      status: item.status,
+      timestamp: item.timestamp, // Raw timestamp
+      formatted_timestamp: new Date(item.timestamp).toLocaleString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }));
+    
+    // Reverse untuk urutkan dari lama → baru (untuk grafik)
+    const sortedHistory = [...history].reverse();
+    
+    // Format untuk chart
+    const chartData = sortedHistory.map(item => ({
+      timestamp: item.timestamp,
+      mpn_value: item.mpn_value,
+      status: item.status,
+      // Format timestamp untuk display dengan tanggal
+      time_label: new Date(item.timestamp).toLocaleString('id-ID', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }));
+    
     return res.status(200).json({
       status: "success",
-      data: history
+      data: formattedData, // Data untuk tabel dengan formatted timestamp (terbaru → terlama)
+      chartData: chartData // Data untuk grafik (terlama → terbaru)
     });
     
   } catch (error) {

@@ -63,6 +63,10 @@ app.use("/api/override", overrideRoutes);
 // Inisialisasi cron job untuk menangani user yang tidak aktif
 require("../tools/inactivity.cron");
 
+// Inisialisasi cron job untuk sync sensor data dari HuggingFace API
+const { startSensorSyncCron } = require("../tools/sensor-sync.cron");
+startSensorSyncCron();
+
 
 // =====================
 // Setup Socket.IO Server

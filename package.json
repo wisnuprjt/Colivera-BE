@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "cron:sensor": "node tools/sensor-sync.cron.js",
+    "cron:inactivity": "node tools/inactivity.cron.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
