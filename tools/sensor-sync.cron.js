@@ -133,21 +133,70 @@ async function runAIPrediction(sensorDataId, sensorData) {
       return;
     }
 
+    // 🔍 DEBUG: Log full prediction result untuk cek struktur response
+    console.log("📊 Full Prediction Result:", JSON.stringify(predictionResult, null, 2));
+
     // Simpan hasil prediksi ke ai_predictions table
     const potable = predictionResult.ai_detection?.potable ?? true;
     const confidence = predictionResult.ai_detection?.confidence ?? 0;
+    
+    // Ambil E.coli MPN prediction dari API (cek semua kemungkinan key)
+    const ecoliMpnPrediction = predictionResult.ecoli_mpn_prediction || 
+                               predictionResult.ai_detection?.ecoli_mpn || 
+                               predictionResult.ai_detection?.ecoli_mpn_prediction ||
+                               predictionResult.predicted_ecoli_mpn ||
+                               null;
+    
+    console.log("🧪 E.coli MPN Prediction extracted:", ecoliMpnPrediction);
+    
+    // ===================================
+    // Logika 3-Tier berdasarkan E.coli MPN
+    // Aman: ≤0.70, Waspada: 0.71-0.99, Bahaya: ≥1.0
+    // ===================================
+    let riskLevel;
+    let status;
+    
+    // Cek apakah API sudah return 3-tier status
+    if (predictionResult.ai_detection?.risk_level) {
+      // Gunakan risk_level dari API (future-proof)
+      riskLevel = predictionResult.ai_detection.risk_level;
+    } else if (ecoliMpnPrediction !== null) {
+      // Hitung risk_level berdasarkan E.coli MPN prediction
+      if (ecoliMpnPrediction <= 0.70) {
+        riskLevel = 'Aman';        // MPN ≤ 0.70
+      } else if (ecoliMpnPrediction >= 0.71 && ecoliMpnPrediction <= 0.99) {
+        riskLevel = 'Waspada';     // MPN 0.71 - 0.99
+      } else {
+        riskLevel = 'Bahaya';      // MPN ≥ 1.0
+      }
+    } else {
+      // Fallback jika tidak ada MPN prediction: gunakan potable & confidence
+      if (!potable) {
+        riskLevel = 'Bahaya';      // Air tidak aman
+      } else if (potable && confidence < 0.7) {
+        riskLevel = 'Waspada';     // Air mungkin aman, tapi AI kurang yakin
+      } else {
+        riskLevel = 'Aman';        // Air aman dan AI yakin
+      }
+    }
+    
+    // Status untuk total_coliform sama dengan risk_level
+    status = riskLevel;
 
+    // Simpan dengan kolom ecoli_mpn_prediction
     await pool.query(
-      `INSERT INTO ai_predictions (sensor_data_id, potable, confidence, prediction_timestamp)
-       VALUES (?, ?, ?, ?)`,
-      [sensorDataId, potable, confidence, new Date()]
+      `INSERT INTO ai_predictions (sensor_data_id, potable, confidence, risk_level, ecoli_mpn_prediction, prediction_timestamp)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [sensorDataId, potable, confidence, riskLevel, ecoliMpnPrediction, new Date()]
     );
 
-    console.log(`🎯 AI Prediction saved: ${potable ? "AMAN ✅" : "BAHAYA ⚠️"} (confidence: ${(confidence * 100).toFixed(1)}%)`);
+    const statusIcon = riskLevel === 'Aman' ? '🟢' : riskLevel === 'Waspada' ? '🟡' : '🔴';
+    const mpnInfo = ecoliMpnPrediction ? ` | E.coli MPN: ${ecoliMpnPrediction.toFixed(2)}` : '';
+    console.log(`🎯 AI Prediction saved: ${statusIcon} ${riskLevel.toUpperCase()} (confidence: ${(confidence * 100).toFixed(1)}%)${mpnInfo}`);
 
-    // Simpan ke total_coliform table juga
-    const status = potable ? 'Normal' : 'Critical';
-    const mpnValue = sensorData.totalcoliform_mv || 0; // Bisa dikonversi kalau ada formula
+    // Simpan ke total_coliform table dengan status Indonesia
+    // Gunakan MPN prediction dari AI kalau ada, kalau tidak pakai sensor raw value
+    const mpnValue = ecoliMpnPrediction || sensorData.totalcoliform_mv || 0;
 
     await pool.query(
       `INSERT INTO total_coliform (sensor_data_id, mpn_value, status, timestamp)
