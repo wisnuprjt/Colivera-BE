@@ -377,13 +377,16 @@ exports.syncColiformHistory = async (req, res) => {
 };
 
 // =============================
-// GET /api/sensor/coliform/history
+// GET /api/sensor/coliform/history?source=sensor|ai_prediction
 // Ambil history total coliform dari database
+// Query params: limit (default: 100), source (optional: 'sensor' or 'ai_prediction')
 // =============================
 exports.getColiformHistory = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;
-    const history = await sensorModel.getColiformHistory(limit);
+    const source = req.query.source; // 'sensor', 'ai_prediction', atau undefined (ambil semua)
+    
+    const history = await sensorModel.getColiformHistory(limit, source);
     
     // Format data untuk tabel (terbaru → terlama) dengan formatted timestamp
     const formattedData = history.map(item => ({

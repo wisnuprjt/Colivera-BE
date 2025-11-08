@@ -15,3 +15,19 @@ exports.getLatestData = async (limit = 10) => {
   );
   return rows;
 };
+
+// Get AI Prediction history dari total_coliform_ai_prediction
+exports.getAIPredictionHistory = async (limit = 10) => {
+  const [rows] = await pool.query(
+    `SELECT 
+      id,
+      timestamp,
+      mpn_value,
+      status
+    FROM total_coliform_ai_prediction 
+    ORDER BY timestamp DESC 
+    LIMIT ?`,
+    [limit]
+  );
+  return rows;
+};

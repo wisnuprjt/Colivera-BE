@@ -145,14 +145,20 @@ exports.insertColiform = async (data) => {
 
 // =============================
 // GET COLIFORM HISTORY
+// Params: limit (default: 100), source (optional: 'sensor' or 'ai_prediction')
+// Sekarang tabel sudah terpisah:
+//   - source='sensor' → query dari total_coliform
+//   - source='ai_prediction' → query dari total_coliform_ai_prediction
 // =============================
-exports.getColiformHistory = async (limit = 100) => {
-  const sql = `
-    SELECT * FROM total_coliform 
-    ORDER BY timestamp DESC 
-    LIMIT ?
-  `;
+exports.getColiformHistory = async (limit = 100, source = null) => {
+  let tableName = 'total_coliform'; // Default: sensor data
   
+  // Pilih tabel berdasarkan source
+  if (source === 'ai_prediction') {
+    tableName = 'total_coliform_ai_prediction';
+  }
+  
+  const sql = `SELECT * FROM ${tableName} ORDER BY timestamp DESC LIMIT ?`;
   const [rows] = await pool.query(sql, [limit]);
   return rows;
 };

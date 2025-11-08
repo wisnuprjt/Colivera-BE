@@ -29,3 +29,25 @@ exports.getLatest = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// GET /api/coliform/ai-prediction/history
+// Ambil riwayat AI prediction dari total_coliform_ai_prediction
+exports.getAIPredictionHistory = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const data = await coliformModel.getAIPredictionHistory(limit);
+    
+    res.json({
+      status: "success",
+      message: "AI Prediction history retrieved successfully",
+      data: data,
+      count: data.length
+    });
+  } catch (err) {
+    console.error("Error fetching AI prediction history:", err);
+    res.status(500).json({ 
+      status: "error",
+      message: "Server error" 
+    });
+  }
+};

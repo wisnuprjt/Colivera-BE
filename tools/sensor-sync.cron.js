@@ -140,14 +140,11 @@ async function runAIPrediction(sensorDataId, sensorData) {
     const potable = predictionResult.ai_detection?.potable ?? true;
     const confidence = predictionResult.ai_detection?.confidence ?? 0;
     
-    // Ambil E.coli MPN prediction dari API (cek semua kemungkinan key)
-    const ecoliMpnPrediction = predictionResult.ecoli_mpn_prediction || 
-                               predictionResult.ai_detection?.ecoli_mpn || 
-                               predictionResult.ai_detection?.ecoli_mpn_prediction ||
-                               predictionResult.predicted_ecoli_mpn ||
-                               null;
+    // 🎯 Ambil Total Coliform MPN prediction dari API
+    // Location: prediction.total_coliform_mpn_100ml
+    const ecoliMpnPrediction = predictionResult.prediction?.total_coliform_mpn_100ml || null;
     
-    console.log("🧪 E.coli MPN Prediction extracted:", ecoliMpnPrediction);
+    console.log("🧪 Total Coliform MPN extracted:", ecoliMpnPrediction);
     
     // ===================================
     // Logika 3-Tier berdasarkan E.coli MPN
@@ -194,17 +191,53 @@ async function runAIPrediction(sensorDataId, sensorData) {
     const mpnInfo = ecoliMpnPrediction ? ` | E.coli MPN: ${ecoliMpnPrediction.toFixed(2)}` : '';
     console.log(`🎯 AI Prediction saved: ${statusIcon} ${riskLevel.toUpperCase()} (confidence: ${(confidence * 100).toFixed(1)}%)${mpnInfo}`);
 
-    // Simpan ke total_coliform table dengan status Indonesia
-    // Gunakan MPN prediction dari AI kalau ada, kalau tidak pakai sensor raw value
-    const mpnValue = ecoliMpnPrediction || sensorData.totalcoliform_mv || 0;
+    // ===================================
+    // Helper function: Hitung status dari MPN value
+    // ===================================
+    const calculateStatusFromMPN = (mpnValue) => {
+      if (mpnValue <= 0.70) return 'Aman';
+      if (mpnValue >= 0.71 && mpnValue <= 0.99) return 'Waspada';
+      return 'Bahaya';
+    };
 
-    await pool.query(
-      `INSERT INTO total_coliform (sensor_data_id, mpn_value, status, timestamp)
-       VALUES (?, ?, ?, ?)`,
-      [sensorDataId, mpnValue, status, sensorData.timestamp]
-    );
+    // ===================================
+    // Simpan 2 data terpisah ke total_coliform:
+    // 1. Total Coliform (Sensor) - Raw millivolt
+    // 2. Total Coliform (AI Prediction) - MPN dari AI
+    // ===================================
+    
+    // 1️⃣ Simpan data dari SENSOR (raw millivolt) dengan REAL-TIME timestamp
+    if (sensorData.totalcoliform_mv !== undefined && sensorData.totalcoliform_mv !== null) {
+      const sensorMpnValue = sensorData.totalcoliform_mv;
+      const sensorStatus = calculateStatusFromMPN(sensorMpnValue);
+      
+      // ✨ Pakai timestamp SEKARANG (saat data masuk backend), bukan dari sensor
+      const currentTimestamp = new Date();
+      
+      await pool.query(
+        `INSERT INTO total_coliform (sensor_data_id, mpn_value, status, timestamp, source)
+         VALUES (?, ?, ?, ?, ?)`,
+        [sensorDataId, sensorMpnValue, sensorStatus, currentTimestamp, 'sensor']
+      );
+      
+      console.log(`📊 Total Coliform (Sensor) saved: ${sensorMpnValue} MPN - ${sensorStatus}`);
+    }
 
-    console.log(`📊 Total coliform data saved with status: ${status}`);
+    // 2️⃣ Simpan data dari AI PREDICTION dengan REAL-TIME timestamp (+1 detik dari sensor)
+    if (ecoliMpnPrediction !== null) {
+      const aiStatus = calculateStatusFromMPN(ecoliMpnPrediction);
+      
+      // ✨ Pakai timestamp SEKARANG + 1 detik supaya AI prediction selalu setelah sensor
+      const aiTimestamp = new Date(new Date().getTime() + 1000);
+      
+      await pool.query(
+        `INSERT INTO total_coliform (sensor_data_id, mpn_value, status, timestamp, source)
+         VALUES (?, ?, ?, ?, ?)`,
+        [sensorDataId, ecoliMpnPrediction, aiStatus, aiTimestamp, 'ai_prediction']
+      );
+      
+      console.log(`🤖 Total Coliform (AI Prediction) saved: ${ecoliMpnPrediction.toFixed(2)} MPN - ${aiStatus}`);
+    }
 
   } catch (error) {
     console.error("❌ Error during AI prediction:", error.message);

@@ -9,4 +9,7 @@ router.get("/", controller.getLatest);
 router.post("/", controller.create);
 router.get("/latest", controller.getLatest);
 
+// AI Prediction history
+router.get("/ai-prediction/history", controller.getAIPredictionHistory);
+
 module.exports = router;
