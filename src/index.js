@@ -60,6 +60,8 @@ app.get("/health", (_, res) =>
 // Semua route dikumpulkan di /src/routes/index.js
 app.use("/api", routes);
 app.use("/api/override", overrideRoutes);
+app.use("/api/auth", require("./routes/auth.routes"));
+app.use("/api/sensor", require("./routes/sensor.routes"));
 
 // =====================
 // Cron Jobs
