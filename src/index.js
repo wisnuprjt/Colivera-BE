@@ -18,9 +18,13 @@ const app = express();
 // =====================
 
 // CORS → izinkan akses dari Frontend (Next.js, dll.)
+const allowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(",").map(origin => origin.trim())
+  : ["http://localhost:3000"]; // Fallback untuk development
+
 app.use(
   cors({
-    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -74,7 +78,7 @@ startAIPredictionSyncCron(); // Akan otomatis call sensor sync juga
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -95,6 +99,7 @@ io.on("connection", (socket) => {
 // Jalankan Server
 // =====================
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () =>
-  console.log(`✅ COLIVERA-BE running with Socket.IO on http://localhost:${PORT}`)
-);
+server.listen(PORT, () => {
+  console.log(`✅ COLIVERA-BE running with Socket.IO on port ${PORT}`);
+  console.log(`🌐 CORS enabled for: ${allowedOrigins.join(', ')}`);
+});
