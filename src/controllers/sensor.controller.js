@@ -318,24 +318,23 @@ exports.syncColiformHistory = async (req, res) => {
         
         console.log(`✅ Sensor data inserted with ID: ${sensorId}`);
         
-        // b. Tentukan status berdasarkan prediksi AI
-        let status = 'AMAN'; // default
+        // b. Ambil nilai MPN dan tentukan status 3-tier
+        const mpnValue = record.totalcoliform_mpn || record.mpn_value || 0;
+        let status = 'Aman'; // default
         
-        if (record.prediction !== undefined) {
-          // Jika ada field prediction dari API
-          status = record.prediction === true || record.prediction === 'potable' ? 'AMAN' : 'BAHAYA';
-        } else if (record.potable !== undefined) {
-          // Atau field potable
-          status = record.potable === true ? 'AMAN' : 'BAHAYA';
-        } else if (record.status) {
-          // Atau sudah ada status langsung
-          status = record.status.toUpperCase() === 'AMAN' ? 'AMAN' : 'BAHAYA';
+        // Gunakan threshold 3-tier
+        if (mpnValue >= 1.0) {
+          status = 'Bahaya';
+        } else if (mpnValue >= 0.71) {
+          status = 'Waspada';
+        } else {
+          status = 'Aman';
         }
         
         // c. Simpan ke total_coliform
         await sensorModel.insertColiform(
           sensorId,
-          record.totalcoliform_mpn || record.mpn_value || 0,
+          mpnValue,
           status
         );
         
@@ -464,6 +463,132 @@ exports.getLatestColiform = async (req, res) => {
     return res.status(500).json({
       status: "error",
       message: "Failed to retrieve latest coliform data"
+    });
+  }
+};
+
+// =============================
+// GET /api/sensor/ai-detection
+// Ambil data sensor terbaru + prediksi AI lengkap dengan rekomendasi
+// =============================
+exports.getAIDetection = async (req, res) => {
+  try {
+    console.log("🤖 Fetching AI Detection data...");
+    
+    // 1. Ambil data sensor terbaru dari database
+    const sensorData = await sensorModel.getLatestSensorData();
+    
+    if (!sensorData) {
+      return res.status(200).json({
+        status: "no_data",
+        message: "Belum ada data sensor untuk prediksi AI"
+      });
+    }
+    
+    // 2. Kirim ke HuggingFace Prediction API
+    const requestData = {
+      temp_c: sensorData.temp_c,
+      do_mgl: sensorData.do_mgl,
+      ph: sensorData.ph,
+      conductivity_uscm: sensorData.conductivity_uscm,
+      totalcoliform_mpn_100ml: sensorData.totalcoliform_mv || 0 // Gunakan raw voltage sensor
+    };
+    
+    console.log("📤 Sending to AI Prediction API:", requestData);
+    
+    const predictResponse = await axios.post(HUGGINGFACE_PREDICT_URL, requestData, {
+      timeout: 15000,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    const predictionResult = predictResponse.data;
+    
+    if (predictionResult.status === "error") {
+      return res.status(500).json({
+        status: "error",
+        message: predictionResult.message || "Prediction API returned error"
+      });
+    }
+    
+    // 3. Extract data AI prediction
+    const aiDetection = predictionResult.ai_detection || {};
+    const prediction = predictionResult.prediction || {};
+    const mpnValue = requestData.totalcoliform_mpn_100ml; // Dari sensor
+    
+    // Determine status 3-tier
+    let status = 'Aman';
+    if (mpnValue >= 1.0) {
+      status = 'Bahaya';
+    } else if (mpnValue >= 0.71) {
+      status = 'Waspada';
+    }
+    
+    // Helper: Clean up text formatting (remove degree symbols artifacts, etc)
+    const cleanText = (text) => {
+      if (!text) return text;
+      return text
+        .replace(/Â°/g, '°')  // Fix degree symbol
+        .replace(/â ï¸/g, '⚠️')  // Fix warning emoji
+        .replace(/ÂµS/g, 'µS')  // Fix micro symbol
+        .trim();
+    };
+    
+    const cleanArray = (arr) => {
+      if (!Array.isArray(arr)) return [];
+      return arr.map(item => cleanText(item)).filter(Boolean);
+    };
+    
+    // 4. Return response lengkap dengan rekomendasi (cleaned)
+    return res.status(200).json({
+      status: "success",
+      data: {
+        mpn_value: mpnValue,
+        status: status,
+        severity: aiDetection.severity || "info",
+        reasons: cleanArray(aiDetection.reasons),
+        recommendations: cleanArray(aiDetection.recommendations),
+        alternative_use: cleanArray(aiDetection.alternative_use),
+        sensor_data: {
+          temp_c: sensorData.temp_c,
+          do_mgl: sensorData.do_mgl,
+          ph: sensorData.ph,
+          conductivity_uscm: sensorData.conductivity_uscm,
+          timestamp: sensorData.timestamp
+        },
+        prediction: {
+          total_coliform_mpn_100ml: prediction.total_coliform_mpn_100ml,
+          ci90_low: prediction.ci90_low,
+          ci90_high: prediction.ci90_high,
+          disclaimer: prediction.disclaimer
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error in AI Detection:", error.message);
+    
+    // Handle timeout
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      return res.status(504).json({
+        status: "error",
+        message: "AI Prediction API timeout"
+      });
+    }
+    
+    // Handle network error
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return res.status(503).json({
+        status: "error",
+        message: "Tidak dapat terhubung ke AI Prediction API"
+      });
+    }
+    
+    return res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to get AI detection"
     });
   }
 };

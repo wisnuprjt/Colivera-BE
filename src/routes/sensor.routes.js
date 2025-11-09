@@ -39,4 +39,12 @@ router.get("/coliform/history", sensorController.getColiformHistory);
 // Ambil data coliform terbaru
 router.get("/coliform/latest", sensorController.getLatestColiform);
 
+// =============================
+// AI DETECTION ENDPOINT
+// =============================
+
+// GET /api/sensor/ai-detection
+// Ambil data sensor + prediksi AI lengkap dengan rekomendasi
+router.get("/ai-detection", sensorController.getAIDetection);
+
 module.exports = router;
