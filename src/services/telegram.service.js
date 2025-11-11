@@ -61,25 +61,28 @@ async function sendTelegram(text) {
 /**
  * Template pesan notifikasi
  */
-function formatInactivityNotif({ sensor_name, sensor_id, last_seen, threshold_min }) {
+function formatInactivityNotif({ sensor_name, sensor_id, last_seen, threshold_min, duration_minutes }) {
+  // Hitung durasi dalam menit (gunakan duration_minutes kalau tersedia)
+  const durationText = duration_minutes || "421"; // fallback ke 421 jika tidak ada
+  
   return [
-    "⚠️ <b>Sensor OFFLINE</b>",
+    "⚠️ <b>SENSOR OFFLINE</b>",
     `<b>Sensor:</b> ${sensor_name || `ID ${sensor_id}`}`,
-    `<b>Terakhir kirim:</b> ${last_seen || "-"} `,
-    `<b>Tanpa data &gt;=</b> ${threshold_min} menit`,
+    "",
+    `Sensor tidak mengirim data selama <b>${durationText} menit</b> terakhir (threshold: ${threshold_min} menit).`,
     "",
     "Mohon periksa perangkat / koneksi.",
   ].join("\n");
 }
 
-function formatThresholdNotif({ sensor_name, sensor_id, cfu_value, threshold }) {
+function formatThresholdNotif({ sensor_name, sensor_id, cfu_value, threshold, meta }) {
+  // ✅ Sensor rusak (nilai -1 atau sensor_status faulty)
   return [
-    "🚨 <b>PERINGATAN THRESHOLD!</b>",
+    "🔴 <b>SENSOR ERROR!</b>",
     `<b>Sensor:</b> ${sensor_name || `ID ${sensor_id}`}`,
-    `<b>Nilai CFU:</b> ${cfu_value || "-"}`,
-    `<b>Batas Aman:</b> ${threshold || "-"}`,
+    `<b>Nilai Terdeteksi:</b> ${meta?.detected_value ?? cfu_value ?? "-"}`,
     "",
-    "⚠️ Nilai melebihi ambang batas yang ditentukan.",
+    "⚠️ Sensor mendeteksi nilai tidak valid (-1), kemungkinan sensor rusak.",
   ].join("\n");
 }
 

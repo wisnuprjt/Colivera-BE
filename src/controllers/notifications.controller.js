@@ -70,11 +70,13 @@ exports.create = async (req, res) => {
           threshold_min: meta?.threshold_min || "-",
         });
       } else {
+        const meta = typeof notif.meta === "string" ? JSON.parse(notif.meta || "{}") : (notif.meta || {});
         text = formatThresholdNotif({
           sensor_name: "Sensor IoT Utama", // Label fixed karena cuma 1 sensor
           sensor_id: notif.sensor_id,
           cfu_value: notif.cfu_value,
           threshold: notif.threshold,
+          meta: meta,
         });
       }
       sendTelegram(text).catch(() => {});
