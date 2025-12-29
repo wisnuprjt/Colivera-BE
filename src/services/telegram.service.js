@@ -62,16 +62,9 @@ async function sendTelegram(text) {
  * Template pesan notifikasi
  */
 function formatInactivityNotif({ sensor_name, sensor_id, last_seen, threshold_min, duration_minutes }) {
-  // Hitung durasi dalam menit (gunakan duration_minutes kalau tersedia)
-  const durationText = duration_minutes || "421"; // fallback ke 421 jika tidak ada
-  
   return [
-    "⚠️ <b>SENSOR OFFLINE</b>",
-    `<b>Sensor:</b> ${sensor_name || `ID ${sensor_id}`}`,
-    "",
-    `Sensor tidak mengirim data selama <b>${durationText} menit</b> terakhir (threshold: ${threshold_min} menit).`,
-    "",
-    "Mohon periksa perangkat / koneksi.",
+    "⚠️ Sensor Offline / API HuggingFace Error",
+    "Mohon periksa perangkat atau koneksi.",
   ].join("\n");
 }
 

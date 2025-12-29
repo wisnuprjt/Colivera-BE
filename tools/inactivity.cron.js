@@ -43,7 +43,7 @@ async function checkInactivity() {
 
       // Kalau belum ada, buat notifikasi baru
       if (existing.length === 0) {
-        const message = `Sensor tidak mengirim data selama ${minutesSince.toFixed(0)} menit terakhir (threshold: ${INACTIVITY_THRESHOLD_MINUTES} menit).`;
+        const message = `Sensor tidak mengirim data selama ${minutesSince.toFixed(0)} menit terakhir.`;
         
         await pool.query(
           `INSERT INTO notifications 
