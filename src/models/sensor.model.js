@@ -37,6 +37,12 @@ exports.insertSensorData = async (data) => {
   const sql = `
     INSERT INTO sensor_data (timestamp, temp_c, do_mgl, ph, conductivity_uscm, totalcoliform_mv)
     VALUES (?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+    temp_c = VALUES(temp_c),
+    do_mgl = VALUES(do_mgl),
+    ph = VALUES(ph),
+    conductivity_uscm = VALUES(conductivity_uscm),
+    totalcoliform_mv = VALUES(totalcoliform_mv)
   `;
   
   const [result] = await pool.query(sql, [
@@ -48,7 +54,18 @@ exports.insertSensorData = async (data) => {
     totalcoliform_mv
   ]);
   
-  return result.insertId;
+  // Jika affectedRows === 1, berarti INSERT baru
+  // Jika affectedRows === 2, berarti UPDATE dari duplicate
+  if (result.affectedRows === 1) {
+    return result.insertId;
+  } else {
+    // Ambil ID dari query SELECT
+    const [rows] = await pool.query(
+      'SELECT id FROM sensor_data WHERE timestamp = ? LIMIT 1',
+      [timestamp]
+    );
+    return rows[0]?.id || result.insertId;
+  }
 };
 
 // =============================

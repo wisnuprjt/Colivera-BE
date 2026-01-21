@@ -69,9 +69,14 @@ app.use("/api/sensor", require("./routes/sensor.routes"));
 // Inisialisasi cron job untuk menangani user yang tidak aktif
 require("../tools/inactivity.cron");
 
-// Inisialisasi cron jobs untuk sync data
-const { startAIPredictionSyncCron } = require("../tools/ai-prediction-sync.cron");
-startAIPredictionSyncCron(); // Akan otomatis call sensor sync juga
+// Inisialisasi cron jobs untuk sync data sensor & AI prediction
+// Dipisah menjadi 2 file terpisah untuk menghindari race condition
+const { startTotalColiformSyncCron } = require("../tools/total-coliform-sync.cron");
+const { startAIDetectionSyncCron } = require("../tools/ai-detection-sync.cron");
+
+// Start kedua cron jobs
+startTotalColiformSyncCron();  // Sync total_coliform (raw sensor data)
+startAIDetectionSyncCron();    // Sync AI detection (AI predictions)
 
 
 // =====================
