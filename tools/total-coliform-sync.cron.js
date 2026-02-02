@@ -24,9 +24,14 @@ const SYNC_INTERVAL_SECONDS = Number(process.env.TOTAL_COLIFORM_SYNC_INTERVAL ||
 
 /**
  * Calculate status based on MPN value
+ * Rusak: -1 (sensor error/not connected)
  * Aman: ≤0.70, Waspada: 0.71-0.99, Bahaya: ≥1.0
  */
 const calculateStatusFromMPN = (mpnValue) => {
+  // Check sensor error first
+  if (mpnValue === -1) return "Rusak";
+  
+  // Then check normal ranges
   if (mpnValue <= 0.70) return "Aman";
   if (mpnValue >= 0.71 && mpnValue <= 0.99) return "Waspada";
   return "Bahaya";

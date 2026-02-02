@@ -39,14 +39,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // ===== CEK APAKAH AKUN SUDAH DIHAPUS =====
-    if (user.is_deleted === 1) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' 
-      });
-    }
-
     // ===== VERIFIKASI PASSWORD =====
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
@@ -130,9 +122,9 @@ exports.me = async (req, res) => {
     if (!req.userId)
       return res.status(401).json({ message: "Unauthorized" });
 
-    // ✅ Cek user termasuk is_deleted untuk deteksi akun terhapus
+    // ✅ Cek user ada di database
     const [rows] = await pool.query(
-      `SELECT id, name, email, role, is_deleted, created_at, updated_at 
+      `SELECT id, name, email, role, created_at, updated_at 
        FROM users 
        WHERE id = ? 
        LIMIT 1`,
@@ -141,8 +133,8 @@ exports.me = async (req, res) => {
 
     const user = rows[0];
     
-    // ✅ Jika user tidak ditemukan ATAU sudah dihapus → force logout
-    if (!user || user.is_deleted === 1) {
+    // ✅ Jika user tidak ditemukan → force logout
+    if (!user) {
       res.clearCookie("token");
       res.clearCookie("refreshToken");
       return res.status(401).json({ 
@@ -151,9 +143,6 @@ exports.me = async (req, res) => {
         message: "Akun Anda telah dihapus" 
       });
     }
-
-    // Hapus is_deleted dari response (tidak perlu dikirim ke frontend)
-    delete user.is_deleted;
 
     return res.json({
       success: true,

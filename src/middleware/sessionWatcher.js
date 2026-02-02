@@ -4,14 +4,14 @@ const jwt = require("jsonwebtoken");
 module.exports = async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      "SELECT role, is_deleted FROM users WHERE id=? LIMIT 1", 
+      "SELECT role FROM users WHERE id=? LIMIT 1", 
       [req.userId]
     );
     
     const user = rows[0];
     
-    // ✅ CEK: Jika user sudah dihapus (soft delete)
-    if (!user || user.is_deleted === 1) {
+    // ✅ CEK: Jika user sudah dihapus (hard delete)
+    if (!user) {
       console.log(`[SESSION INVALID] User ${req.userId} has been deleted. Force logout.`);
       
       // Hapus cookie token
@@ -21,7 +21,7 @@ module.exports = async (req, res, next) => {
       // Kirim response 401 dengan flag khusus
       return res.status(401).json({ 
         success: false,
-        message: "Akun Anda telah dinonaktifkan oleh administrator.",
+        message: "Akun Anda telah dihapus oleh administrator.",
         accountDeleted: true,  // Flag khusus untuk frontend
         forceLogout: true
       });

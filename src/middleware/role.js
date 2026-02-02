@@ -22,7 +22,7 @@ module.exports = (allowed = []) => async (req, res, next) => {
 
     // Query pakai mysql2 pool
     const [rows] = await pool.query(
-      "SELECT id, role FROM users WHERE id=? AND is_deleted=0 LIMIT 1",
+      "SELECT id, role FROM users WHERE id=? LIMIT 1",
       [req.userId]
     );
     const user = rows[0];

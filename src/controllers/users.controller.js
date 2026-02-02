@@ -55,9 +55,9 @@ exports.list = async (req, res) => {
   try {
     const { q, role } = req.query;
     let sql = `
-      SELECT id, name, email, role, is_deleted, created_at, updated_at
+      SELECT id, name, email, role, created_at, updated_at
       FROM users
-      WHERE is_deleted = 0
+      WHERE 1=1
     `;
     const params = [];
 
@@ -88,7 +88,7 @@ exports.list = async (req, res) => {
 exports.getOne = async (req, res) => {
   const id = Number(req.params.id);
   const [rows] = await pool.query(
-    "SELECT id, name, email, role, is_deleted, created_at, updated_at FROM users WHERE id=? AND is_deleted=0 LIMIT 1",
+    "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id=? LIMIT 1",
     [id]
   );
   const user = rows[0];
@@ -103,7 +103,7 @@ exports.getOne = async (req, res) => {
 exports.getProfile = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id=? AND is_deleted=0 LIMIT 1",
+      "SELECT id, name, email, role, created_at, updated_at FROM users WHERE id=? LIMIT 1",
       [req.userId]
     );
     if (rows.length === 0)
@@ -147,7 +147,7 @@ exports.update = async (req, res) => {
 
   try {
     const [r] = await pool.query(
-      `UPDATE users SET ${updates.join(", ")} WHERE id=? AND is_deleted=0`,
+      `UPDATE users SET ${updates.join(", ")} WHERE id=?`,
       params
     );
     if (r.affectedRows === 0) {
@@ -197,7 +197,7 @@ exports.changePassword = async (req, res) => {
 
   const hash = await bcrypt.hash(newPassword, 10);
   const [r] = await pool.query(
-    "UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=? AND is_deleted=0",
+    "UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=?",
     [hash, id]
   );
   if (r.affectedRows === 0) return res.status(404).json({ message: "User not found" });
@@ -218,7 +218,7 @@ exports.changePassword = async (req, res) => {
 exports.remove = async (req, res) => {
   const id = Number(req.params.id);
   const [r] = await pool.query(
-    "UPDATE users SET is_deleted=1, updated_at=NOW() WHERE id=? AND is_deleted=0",
+    "DELETE FROM users WHERE id=?",
     [id]
   );
   if (r.affectedRows === 0) return res.status(404).json({ message: "User not found" });
